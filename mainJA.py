@@ -18,6 +18,7 @@ df_orders = pd.read_csv(ruta_archivo, encoding="utf-8")
 df_customers = pd.read_csv(ruta_archivo2, encoding="utf-8")
 df_items = pd.read_csv(ruta_archivo3, encoding="utf-8")
 df_reviews = pd.read_csv(ruta_archivo4, encoding="utf-8")
+#print(df_reviews.head(35))
 df_payments = pd.read_csv(ruta_archivo5, encoding="utf-8")
 
 # Filtrar las columnas relevantes
@@ -35,7 +36,10 @@ df_reviews_filtrado = df_reviews[["order_id", "review_id", "review_score"]]
 df_orders_customers = df_orders_filtrado.merge(df_customers_filtrado, left_on='customer_id', right_on='customer_id', how='left')
 df_orders_customers_payments = df_orders_customers.merge(df_payments_filtrado, left_on='order_id', right_on='order_id', how='left')
 df_orders_customers_payments_items = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
-df_orders_customers_payments_items_review =df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
+df_orders_customers_payments_items_review = df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
+
+# Eliminacion de duplicados
+df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop_duplicates()
 
 # Convertir columnas de fecha a tipo datetime
 columnas_fecha = [
@@ -43,7 +47,8 @@ columnas_fecha = [
     'order_approved_at',
     'order_delivered_carrier_date',
     'order_delivered_customer_date',
-    'order_estimated_delivery_date'
+    'order_estimated_delivery_date',
+    'shipping_limit_date'
 ]
 
 for columna in columnas_fecha:
@@ -58,25 +63,45 @@ primer_año_por_cliente = (
 )
 df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.merge(primer_año_por_cliente, on='customer_id', how='left')
 
-# Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
-formato_fecha = "%Y-%m-%d %H:%M:%S"
-
-for columna in columnas_fecha:
-    df_orders_customers_payments_items_review[columna] = df_orders_customers_payments_items_review[columna].dt.strftime(formato_fecha)
-
 # Conteo de nulos y eliminacion de duplicados
-print(df_orders_customers_payments_items_review.isnull().any().any())
-print(df_orders_customers_payments_items_review.isnull().sum())
+#print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review["payment_value"].isnull()])
+#print(df_orders_customers_payments_items_review.isnull().sum())
 df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop_duplicates()
 
 # Rellenar fechas nulas con una fecha falsa, para su posterior deteccion en el analisis
 df_orders_customers_payments_items_review['order_approved_at'] = df_orders_customers_payments_items_review['order_approved_at'].fillna(pd.Timestamp('1900-12-31'))
 df_orders_customers_payments_items_review['order_delivered_carrier_date'] = df_orders_customers_payments_items_review['order_delivered_carrier_date'].fillna(pd.Timestamp('1900-12-31'))
 df_orders_customers_payments_items_review['order_delivered_customer_date'] = df_orders_customers_payments_items_review['order_delivered_customer_date'].fillna(pd.Timestamp('1900-12-31'))
+df_orders_customers_payments_items_review['shipping_limit_date'] = df_orders_customers_payments_items_review['shipping_limit_date'].fillna(pd.Timestamp('1900-12-31'))
 
+# Rellenado del único pedido con pago nulo
+df_orders_customers_payments_items_review.loc[
+    df_orders_customers_payments_items_review['order_id'] == 'bfbd0f9bdef84302105ad712db648a6c',
+    ['payment_sequential', 'payment_value']
+] = [1, 47.82]
+
+# Calcular la diferencia y extraer los días
+df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
+    df_orders_customers_payments_items_review['shipping_limit_date'] - df_orders_customers_payments_items_review['order_delivered_customer_date']
+).dt.days
+
+# Aplicar lógica: si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
+df_orders_customers_payments_items_review['dias_retraso_entrega'] = df_orders_customers_payments_items_review['dias_retraso_entrega'].apply(lambda x: 0 if x >= 0 else abs(x))
+
+df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['dias_retraso_entrega'] > 0]
+#print(df_retrasos.head(30))
+
+# Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
+formato_fecha = "%Y-%m-%d %H:%M:%S"
+
+for columna in columnas_fecha:
+    df_orders_customers_payments_items_review[columna] = df_orders_customers_payments_items_review[columna].dt.strftime(formato_fecha)
+
+#print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review["payment_value"].isnull()])
 print(df_orders_customers_payments_items_review.isnull().any().any())
 print(df_orders_customers_payments_items_review.isnull().sum())
-print(df_orders_customers_payments_items_review)
+#print(df_orders_customers_payments_items_review)
+#print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['order_id'] == 'e6cc57f923c4dab2222b8c9aa8742eea'])
 
 
 '''
