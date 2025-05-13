@@ -43,3 +43,19 @@ print(df_orders_customers.dtypes)
 
 df_orders_customers['order_approved_at'] = df_orders_customers['order_approved_at'].fillna(pd.Timestamp('1900-12-31'))
 #print(df_orders_customers['fecha_columna'])
+
+
+'''
+clientes_por_estado = df_orders_customers.groupby("customer_state")["customer_id"].nunique().sort_values(ascending=False)
+
+# Top 5 estados
+top_5_estados = clientes_por_estado.head(5)
+print(top_5_estados)
+
+df_top_estados = df_orders_customers[df_orders_customers['customer_state'].isin(top_5_estados.index)]
+
+# Agrupar por estado y ciudad, contando clientes únicos
+tabla_estado_ciudad = df_top_estados.groupby(["customer_state", "customer_city"])["customer_id"].nunique().reset_index()
+tabla_estado_ciudad.rename(columns={"customer_id": "n_clientes"}, inplace=True)
+print(tabla_estado_ciudad)
+'''
