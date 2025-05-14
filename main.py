@@ -205,6 +205,9 @@ ax1.boxplot(x=pedidos_clientes["count_customers"])
 fi_dispersion_pedidos_clientes, ax2= plt.subplots()
 ax2.scatter(pedidos_clientes["count_customers"], pedidos_clientes["count_orders"])
 
+
+
+
 #3. nº pedidos tarde por ciudad. % respecto al total de pedidos por ciudad. Tiempo medio de días tarde.
 #Creamos df agrupando ciudades y creando dos columnas, una con la cantidad de pedidos retrasados y otra con el número de pedidos por ciudad.
 
@@ -230,10 +233,12 @@ pedidos = ax3.bar(pedidos_tarde["customer_city"], pedidos_tarde["num_pedidos"], 
 ax3.set_xticks(pedidos_tarde["customer_city"],pedidos_tarde["customer_city"], rotation = "vertical")
 
 #fig_pedidos_retraso_barras.suptitle("Relación de retrasos y pedidos totales por ciudad")
+fig_tabla_porcent_total, ax4 = plt.subplots()
+ax4.scatter(pedidos_tarde["cantidad_pedidos_tarde"], pedidos_tarde["num_pedidos"], s=pedidos_tarde["porcentaje_tarde"], c=pd.Categorical(pedidos_tarde["customer_city"]).codes, cmap="rainbow")
 
 
-fig_media_retraso_ciudad, ax4 = plt.subplots()
-ax4.barh(pedidos_tarde["customer_city"], pedidos_tarde["media_dias_tarde"])
+fig_media_retraso_ciudad, ax5 = plt.subplots()
+ax5.barh(pedidos_tarde["customer_city"], pedidos_tarde["media_dias_tarde"])
 
 #4. nº de review por stado y score medio en cada una
 
@@ -245,32 +250,32 @@ review_state = df_ejercicio4.groupby("customer_state").agg(
 #Creamos la figura
 fig_num_review_media= plt.figure()
 #Añadimos un subplot a la figura
-ax5 = fig_num_review_media.add_subplot(111)
+ax6 = fig_num_review_media.add_subplot(111)
 #twinx() sirve para tener dos ejes "y" en lugar de uno. Su "gemelo" en el lado contrario
-ax6 = ax5.twinx()
+ax7 = ax6.twinx()
 #Creamos los gráficos, indicando como eje x, común a ambos, los estados. Como eje y, cada gráfico tiene el suyo.
-ax5.bar(review_state["customer_state"],review_state["num_review"], color = "Teal")
-ax6.plot(review_state["customer_state"],review_state["mean_score"], color="Maroon")
+ax6.bar(review_state["customer_state"],review_state["num_review"], color = "Teal")
+ax7.plot(review_state["customer_state"],review_state["mean_score"], color="Maroon")
 
 #Añadimos el límite en el eje y del gráfico de línea en 5, dado que se puntúa entre 0 y 5. 
-ax6.set_ylim(0,  5)
+ax7.set_ylim(0,  5)
 #Indicamos que el eje y del gráfico de reviews va a la derecha
-ax5.yaxis.set_label_position("right")
+ax6.yaxis.set_label_position("right")
 #Movemos las etiquetas del eje al lado derecho.
-ax5.yaxis.tick_right()
+ax6.yaxis.tick_right()
 #Indicamos que el eje y del gráfico de medias va a la izquierda
-ax6.yaxis.set_label_position("left")
+ax7.yaxis.set_label_position("left")
 #Dejamos las etiquetas del eje en el lado izquierdo
-ax6.yaxis.tick_left()
+ax7.yaxis.tick_left()
 #Con spines podemos mostrar u ocultar los ejes del gráfico. En este caso, ocultamos (set_visible(False)) el eje superior ("top")para simplificar el gráfico
-ax5.spines['top'].set_visible(False)
 ax6.spines['top'].set_visible(False)
+ax7.spines['top'].set_visible(False)
 
 #Añadimos título y etiquetas a los ejes
 # fig_num_review_media.suptitle("Mean and number of reviews in each State")
-# ax6.set_ylabel("Mean Score")
-# ax5.set_ylabel("Number of reviews")
-# ax5.set_xlabel("States")
+# ax7.set_ylabel("Mean Score")
+# ax6.set_ylabel("Number of reviews")
+# ax6.set_xlabel("States")
 
 #plt.show()
 
@@ -286,24 +291,47 @@ print(solo_retrasados["delivered_carrier-approved"].mean(), solo_retrasados["del
 print(solo_retrasados["estimated_delivery-delivered_carrier"].mean(), solo_retrasados["estimated_delivery-delivered_carrier"].std())
 print(solo_retrasados["delivered_customer-estimated_delivery"].mean(), solo_retrasados["delivered_customer-estimated_delivery"].std())
 
-fig_diferencia_aprobado_compra, ax7 = plt.subplots()
+fig_diferencia_aprobado_compra, ax8 = plt.subplots()
 # #Hay algunos outliers 
-ax7.boxplot( solo_retrasados["approved-purchase"])
-fig_diferencia_almacen_aprobado, ax8 = plt.subplots()
-ax8.boxplot(solo_retrasados["delivered_carrier-approved"])
-fig_diferencia_entrega_estimada_almacen, ax9 = plt.subplots()
-ax9.boxplot( solo_retrasados["estimated_delivery-delivered_carrier"])
+ax8.boxplot( solo_retrasados["approved-purchase"])
+
+fig_diferencia_almacen_aprobado, ax9 = plt.subplots()
+ax9.boxplot(solo_retrasados["delivered_carrier-approved"], showfliers=False)
+
+fig_diferencia_entrega_estimada_almacen, ax10 = plt.subplots()
+ax10.boxplot( solo_retrasados["estimated_delivery-delivered_carrier"], showfliers=False)
+
 #Claramente se ve un problema en la estimación de la fecha de entrega de los pedidos.
-fig_diferencia_entrega_estimacion, ax10 = plt.subplots() 
-ax10.boxplot( solo_retrasados["delivered_customer-estimated_delivery"])
+fig_diferencia_entrega_estimacion, ax11 = plt.subplots() 
+ax11.boxplot( solo_retrasados["delivered_customer-estimated_delivery"], showfliers=False)
+
 #plt.show()
 
 
 error_estimacion_fecha = solo_retrasados.groupby("delivered_customer-estimated_delivery")["order_id"].count().reset_index().sort_values(by="order_id", ascending=False)
 print(error_estimacion_fecha)
-fig_error_estimacion_fecha, ax11 = plt.subplots()
-ax11.scatter( error_estimacion_fecha["order_id"], error_estimacion_fecha["delivered_customer-estimated_delivery"])
-plt.show()
+fig_error_estimacion_fecha, ax12 = plt.subplots()
+ax12.scatter( error_estimacion_fecha["order_id"], error_estimacion_fecha["delivered_customer-estimated_delivery"])
+#plt.show()
 
-#relacion_review_precio = df_orders_customers_payments_items_review["customer_id", ""]
-print(df_ejercicio4.head(30))
+
+relacion_review_precio = df_ejercicio4.groupby("customer_state").agg(media_reviews = ("review_score", "mean"),
+                                            media_precios = ("payment_value", "mean"),
+                                            num_pedidos = ("order_id", "count")).reset_index().sort_values(by="media_reviews", ascending=False)
+print(relacion_review_precio)
+#Relación entre reviews y precio. En precios intermedios no importa tanto puntuar "bajo", mientras que en precios bajos y altos se puntua mejor
+fig_relacion_review_precio, ax13 = plt.subplots()
+ax13.scatter(relacion_review_precio["media_reviews"], relacion_review_precio["media_precios"])
+
+fig_relacion_pedidos_precio, ax14 = plt.subplots()
+ax14.scatter(relacion_review_precio["num_pedidos"], relacion_review_precio["media_precios"])
+
+fig_relacion_review_pedidos, ax15 = plt.subplots()
+ax15.scatter(relacion_review_precio["media_reviews"], relacion_review_precio["num_pedidos"])
+
+fig_hist_review, ax16 = plt.subplots()
+ax16.hist(relacion_review_precio["media_reviews"])
+fig_hist_precio, ax17 = plt.subplots()
+ax17.hist(relacion_review_precio["media_precios"])
+
+plt.show()
