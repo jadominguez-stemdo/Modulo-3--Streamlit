@@ -100,25 +100,26 @@ df_review_orders = df_reviews.merge(
     on="order_id",
     how="left"
 )
-
+ 
 df_reviews_full = df_review_orders.merge(
     df_customers[["customer_id", "customer_state"]],
     on="customer_id",
     how="left"
 )
-
+ 
 df_reviews_full = df_reviews_full.merge(
-    df_orders_customers_payments_items_review[["order_id", "dias_retraso_entrega"]],
+    df_orders_customers_payments_items_review[["order_id", "dias_retraso_entrega", "payment_value"]],
     on="order_id",
     how="left"
 )
-
+ 
 # Filtrar solo los pedidos sin retraso
 df_reviews_full_sin_retraso = df_reviews_full[df_reviews_full["dias_retraso_entrega"] == 0]
-
+ 
 # Seleccionar columnas finales
-df_ejercicio4 = df_reviews_full_sin_retraso[["customer_state", "review_id", "review_score", "dias_retraso_entrega"]]
-
+df_ejercicio4 = df_reviews_full_sin_retraso[[
+    "customer_state", "review_id", "review_score", "dias_retraso_entrega", "payment_value", "order_id", "customer_id"
+]]
 # Mostrar resultados
 df_ejercicio4.to_csv('df_ejercicio4.csv', index=False)
 
@@ -198,7 +199,7 @@ pedidos_clientes = df_orders_customers_payments_items_review.groupby(["customer_
 print(pedidos_clientes)
 fig_pedidos_clientes_estado, ax = plt.subplots()
 ax.bar(pedidos_clientes["customer_state"], pedidos_clientes["count_customers"])
-fig_pedidos_clientes_estado("Pedidos realizados por estado")
+#fig_pedidos_clientes_estado("Pedidos realizados por estado")
 fig_boxplot_clientes, ax1 = plt.subplots()
 ax1.boxplot(x=pedidos_clientes["count_customers"])
 fi_dispersion_pedidos_clientes, ax2= plt.subplots()
@@ -271,4 +272,38 @@ ax6.spines['top'].set_visible(False)
 # ax5.set_ylabel("Number of reviews")
 # ax5.set_xlabel("States")
 
+#plt.show()
+
+solo_retrasados = df_orders_customers_payments_items_review[df_orders_customers_payments_items_review["dias_retraso_entrega"]>0]
+solo_retrasados["approved-purchase"] = (solo_retrasados["order_approved_at"]-solo_retrasados["order_purchase_timestamp"]).dt.days
+solo_retrasados["delivered_carrier-approved"] = (solo_retrasados["order_delivered_carrier_date"]- solo_retrasados["order_approved_at"]).dt.days
+solo_retrasados["estimated_delivery-delivered_carrier"] = (solo_retrasados["order_estimated_delivery_date"] - solo_retrasados["order_delivered_carrier_date"]).dt.days
+solo_retrasados["delivered_customer-estimated_delivery"] = (solo_retrasados["order_delivered_customer_date"] - solo_retrasados["order_estimated_delivery_date"]).dt.days
+print(solo_retrasados)
+
+print(solo_retrasados["approved-purchase"].mean(), solo_retrasados["approved-purchase"].std())
+print(solo_retrasados["delivered_carrier-approved"].mean(), solo_retrasados["delivered_carrier-approved"].std())
+print(solo_retrasados["estimated_delivery-delivered_carrier"].mean(), solo_retrasados["estimated_delivery-delivered_carrier"].std())
+print(solo_retrasados["delivered_customer-estimated_delivery"].mean(), solo_retrasados["delivered_customer-estimated_delivery"].std())
+
+fig_diferencia_aprobado_compra, ax7 = plt.subplots()
+# #Hay algunos outliers 
+ax7.boxplot( solo_retrasados["approved-purchase"])
+fig_diferencia_almacen_aprobado, ax8 = plt.subplots()
+ax8.boxplot(solo_retrasados["delivered_carrier-approved"])
+fig_diferencia_entrega_estimada_almacen, ax9 = plt.subplots()
+ax9.boxplot( solo_retrasados["estimated_delivery-delivered_carrier"])
+#Claramente se ve un problema en la estimación de la fecha de entrega de los pedidos.
+fig_diferencia_entrega_estimacion, ax10 = plt.subplots() 
+ax10.boxplot( solo_retrasados["delivered_customer-estimated_delivery"])
+#plt.show()
+
+
+error_estimacion_fecha = solo_retrasados.groupby("delivered_customer-estimated_delivery")["order_id"].count().reset_index().sort_values(by="order_id", ascending=False)
+print(error_estimacion_fecha)
+fig_error_estimacion_fecha, ax11 = plt.subplots()
+ax11.scatter( error_estimacion_fecha["order_id"], error_estimacion_fecha["delivered_customer-estimated_delivery"])
 plt.show()
+
+#relacion_review_precio = df_orders_customers_payments_items_review["customer_id", ""]
+print(df_ejercicio4.head(30))
