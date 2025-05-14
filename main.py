@@ -196,9 +196,9 @@ pedidos_clientes = df_orders_customers_payments_items_review.groupby(["customer_
     count_orders = ("order_id", "count"), count_customers = ("customer_id", "count")
     ).reset_index().sort_values(by="count_orders", ascending=False)
 print(pedidos_clientes)
-"""Barajamos posibilidades. ¿Mejor plot, pie o bigotes? Hay muchos clientes que han hecho muy pocos pedidos y muy pocos clientes que han hecho muchos pedidos"""
 fig_pedidos_clientes_estado, ax = plt.subplots()
 ax.bar(pedidos_clientes["customer_state"], pedidos_clientes["count_customers"])
+fig_pedidos_clientes_estado("Pedidos realizados por estado")
 fig_boxplot_clientes, ax1 = plt.subplots()
 ax1.boxplot(x=pedidos_clientes["count_customers"])
 fi_dispersion_pedidos_clientes, ax2= plt.subplots()
@@ -222,18 +222,17 @@ fig_pedidos_retraso_barras, ax3= plt.subplots()
 retrasos = ax3.bar(pedidos_tarde["customer_city"], pedidos_tarde["cantidad_pedidos_tarde"], label = "cantidad_pedidos_tarde", facecolor = 'mediumseagreen' )
 pedidos = ax3.bar(pedidos_tarde["customer_city"], pedidos_tarde["num_pedidos"], bottom=pedidos_tarde["cantidad_pedidos_tarde"], label = "num_pedidos", facecolor= 'xkcd:sky blue')
 
-fig_media_retraso_ciudad = plt.barh(pedidos_tarde["customer_city"], pedidos_tarde["media_dias_tarde"])
-
 #Añadimos titulo y etiquetas
-ax3.legend()
-ax3.bar_label(retrasos, padding=0)
-ax3.bar_label(pedidos, padding=3)
+# ax3.legend()
+# ax3.bar_label(retrasos, padding=0)
+# ax3.bar_label(pedidos, padding=3)
 ax3.set_xticks(pedidos_tarde["customer_city"],pedidos_tarde["customer_city"], rotation = "vertical")
-ax3.set_yticks(pedidos_tarde["num_pedidos"], pedidos_tarde["num_pedidos"])
-#ax[1].set_xticks(pedidos_tarde["customer_city"],pedidos_tarde["customer_city"], rotation = "vertical")
 
-fig_pedidos_retraso_barras.suptitle("Relación de retrasos y pedidos totales por ciudad")
+#fig_pedidos_retraso_barras.suptitle("Relación de retrasos y pedidos totales por ciudad")
 
+
+fig_media_retraso_ciudad, ax4 = plt.subplots()
+ax4.barh(pedidos_tarde["customer_city"], pedidos_tarde["media_dias_tarde"])
 
 #4. nº de review por stado y score medio en cada una
 
@@ -245,31 +244,31 @@ review_state = df_ejercicio4.groupby("customer_state").agg(
 #Creamos la figura
 fig_num_review_media= plt.figure()
 #Añadimos un subplot a la figura
-ax4 = fig_num_review_media.add_subplot(111)
+ax5 = fig_num_review_media.add_subplot(111)
 #twinx() sirve para tener dos ejes "y" en lugar de uno. Su "gemelo" en el lado contrario
-ax5 = ax4.twinx()
+ax6 = ax5.twinx()
 #Creamos los gráficos, indicando como eje x, común a ambos, los estados. Como eje y, cada gráfico tiene el suyo.
-ax4.bar(review_state["customer_state"],review_state["num_review"], color = "Teal")
-ax5.plot(review_state["customer_state"],review_state["mean_score"], color="Maroon")
+ax5.bar(review_state["customer_state"],review_state["num_review"], color = "Teal")
+ax6.plot(review_state["customer_state"],review_state["mean_score"], color="Maroon")
 
 #Añadimos el límite en el eje y del gráfico de línea en 5, dado que se puntúa entre 0 y 5. 
-ax5.set_ylim(0,  5)
+ax6.set_ylim(0,  5)
 #Indicamos que el eje y del gráfico de reviews va a la derecha
-ax4.yaxis.set_label_position("right")
+ax5.yaxis.set_label_position("right")
 #Movemos las etiquetas del eje al lado derecho.
-ax4.yaxis.tick_right()
+ax5.yaxis.tick_right()
 #Indicamos que el eje y del gráfico de medias va a la izquierda
-ax5.yaxis.set_label_position("left")
+ax6.yaxis.set_label_position("left")
 #Dejamos las etiquetas del eje en el lado izquierdo
-ax5.yaxis.tick_left()
+ax6.yaxis.tick_left()
 #Con spines podemos mostrar u ocultar los ejes del gráfico. En este caso, ocultamos (set_visible(False)) el eje superior ("top")para simplificar el gráfico
-ax4.spines['top'].set_visible(False)
 ax5.spines['top'].set_visible(False)
+ax6.spines['top'].set_visible(False)
 
 #Añadimos título y etiquetas a los ejes
-fig_num_review_media.suptitle("Mean and number of reviews in each State")
-ax5.set_ylabel("Mean Score")
-ax4.set_ylabel("Number of reviews")
-ax4.set_xlabel("States")
+# fig_num_review_media.suptitle("Mean and number of reviews in each State")
+# ax6.set_ylabel("Mean Score")
+# ax5.set_ylabel("Number of reviews")
+# ax5.set_xlabel("States")
 
 plt.show()
