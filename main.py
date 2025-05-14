@@ -93,8 +93,34 @@ df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
 # Si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
 df_orders_customers_payments_items_review['dias_retraso_entrega'] = df_orders_customers_payments_items_review['dias_retraso_entrega'].apply(lambda x: 0 if x >= 0 else abs(x))
 
-df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['dias_retraso_entrega'] > 0]
 
+# Combinación de datasets para el ejercicio 4
+df_review_orders = df_reviews.merge(
+    df_orders[["order_id", "customer_id"]],
+    on="order_id",
+    how="left"
+)
+
+df_reviews_full = df_review_orders.merge(
+    df_customers[["customer_id", "customer_state"]],
+    on="customer_id",
+    how="left"
+)
+
+df_reviews_full = df_reviews_full.merge(
+    df_orders_customers_payments_items_review[["order_id", "dias_retraso_entrega"]],
+    on="order_id",
+    how="left"
+)
+
+# Filtrar solo los pedidos sin retraso
+df_reviews_full_sin_retraso = df_reviews_full[df_reviews_full["dias_retraso_entrega"] == 0]
+
+# Seleccionar columnas finales
+df_ejercicio4 = df_reviews_full_sin_retraso[["customer_state", "review_id", "review_score", "dias_retraso_entrega"]]
+
+# Mostrar resultados
+df_ejercicio4.to_csv('df_ejercicio4.csv', index=False)
 
 
 # Calculo de clientes por estado
@@ -166,75 +192,84 @@ state_RS = tabla_estado_ciudad[tabla_estado_ciudad['customer_state']=="RS"].sort
 
 #2. Añadir dos columnas, numero de pedido y porcentaje respecto al total de pedidos
 #Creamos df agrupado por customer_id y creamos una columna nueva que nos cuente la cantidad de pedidos (order_id)
-pedidos_clientes = df_orders_customers_payments_items_review.groupby("customer_id").agg(count_orders = ("order_id", "count")).reset_index().sort_values(by="count_orders", ascending=False)
-#Actualizamos df agrupando por numero de pedidos y agregando columna nueva con la cantidad de clientes que tiene el mismo número de pedidos.
-pedidos_clientes = pedidos_clientes.groupby("count_orders").agg(count_customer=("customer_id", "count")).reset_index().sort_values(by="count_orders", ascending=False)
+pedidos_clientes = df_orders_customers_payments_items_review.groupby(["customer_state", "customer_city"]).agg(
+    count_orders = ("order_id", "count"), count_customers = ("customer_id", "count")
+    ).reset_index().sort_values(by="count_orders", ascending=False)
 print(pedidos_clientes)
 """Barajamos posibilidades. ¿Mejor plot, pie o bigotes? Hay muchos clientes que han hecho muy pocos pedidos y muy pocos clientes que han hecho muchos pedidos"""
-#plt.plot(pedidos_clientes["count_orders"], pedidos_clientes["count_customer"])
-#plt.pie(pedidos_clientes["count_customer"])
-#plt.boxplot(x=pedidos_clientes["count_customer"])
-#plt.hist(pedidos_clientes["count_orders"], bins=20)
+fig_pedidos_clientes_estado, ax = plt.subplots()
+ax.bar(pedidos_clientes["customer_state"], pedidos_clientes["count_customers"])
+fig_boxplot_clientes, ax1 = plt.subplots()
+ax1.boxplot(x=pedidos_clientes["count_customers"])
+fi_dispersion_pedidos_clientes, ax2= plt.subplots()
+ax2.scatter(pedidos_clientes["count_customers"], pedidos_clientes["count_orders"])
 
 #3. nº pedidos tarde por ciudad. % respecto al total de pedidos por ciudad. Tiempo medio de días tarde.
 #Creamos df agrupando ciudades y creando dos columnas, una con la cantidad de pedidos retrasados y otra con el número de pedidos por ciudad.
+
 pedidos_tarde =df_orders_customers_payments_items_review.groupby("customer_city").agg(
-    cantidad_pedidos_tarde = ("dias_retraso_entrega", lambda x: (x > 0).sum()),
-    num_pedidos =("order_id", "count")).reset_index().sort_values(by="cantidad_pedidos_tarde", ascending=False).head(20)
+     cantidad_pedidos_tarde = ("dias_retraso_entrega", lambda x: (x > 0).sum()),
+     media_dias_tarde = ("dias_retraso_entrega", lambda x: x[x > 0].mean()),
+     num_pedidos =("order_id", "count")).reset_index().sort_values(by="cantidad_pedidos_tarde", ascending=False).head(20)
 #Añadimos una columna con el porcentaje de pedidos tarde.
 pedidos_tarde["porcentaje_tarde"] = round(pedidos_tarde.cantidad_pedidos_tarde/pedidos_tarde.num_pedidos*100, 2)
 print(pedidos_tarde)
 
 #Creamos la figura
-fig, ax= plt.subplots()
+fig_pedidos_retraso_barras, ax3= plt.subplots()
 
 #Creamos ambas barras, apiladas
-retrasos = ax.bar(pedidos_tarde["customer_city"], pedidos_tarde["cantidad_pedidos_tarde"], label = "cantidad_pedidos_tarde", facecolor = 'mediumseagreen' )
-pedidos = ax.bar(pedidos_tarde["customer_city"], pedidos_tarde["num_pedidos"], bottom=pedidos_tarde["cantidad_pedidos_tarde"], label = "num_pedidos", facecolor= 'xkcd:sky blue')
-#Añadimos titulo y etiquetas
-ax.legend()
-ax.bar_label(retrasos, padding=0)
-ax.bar_label(pedidos, padding=3)
-fig.suptitle("Relación de retrasos y pedidos totales por ciudad")
+retrasos = ax3.bar(pedidos_tarde["customer_city"], pedidos_tarde["cantidad_pedidos_tarde"], label = "cantidad_pedidos_tarde", facecolor = 'mediumseagreen' )
+pedidos = ax3.bar(pedidos_tarde["customer_city"], pedidos_tarde["num_pedidos"], bottom=pedidos_tarde["cantidad_pedidos_tarde"], label = "num_pedidos", facecolor= 'xkcd:sky blue')
 
-plt.show()
+fig_media_retraso_ciudad = plt.barh(pedidos_tarde["customer_city"], pedidos_tarde["media_dias_tarde"])
+
+#Añadimos titulo y etiquetas
+ax3.legend()
+ax3.bar_label(retrasos, padding=0)
+ax3.bar_label(pedidos, padding=3)
+ax3.set_xticks(pedidos_tarde["customer_city"],pedidos_tarde["customer_city"], rotation = "vertical")
+ax3.set_yticks(pedidos_tarde["num_pedidos"], pedidos_tarde["num_pedidos"])
+#ax[1].set_xticks(pedidos_tarde["customer_city"],pedidos_tarde["customer_city"], rotation = "vertical")
+
+fig_pedidos_retraso_barras.suptitle("Relación de retrasos y pedidos totales por ciudad")
 
 
 #4. nº de review por stado y score medio en cada una
-"""Falta eliminar los reviews de los pedidos retrasados"""
 
 #Creamos df agrupado por estado en el que añadimos dos columnas, nº de reviews por estado y su media. 
-# No añadimos reset_index() porque nos interesa usar la columna de estado como indice en el gráfico. Ordenamos por media para mejor visualización
-review_state = df_orders_customers_payments_items_review.groupby("customer_state").agg(
+# No añadimos reset_index() porque nosorders_customers_payments_items_review interesa usar la columna de estado como indice en el gráfico. Ordenamos por media para mejor visualización
+review_state = df_ejercicio4.groupby("customer_state").agg(
     num_review = ("review_id", "count"), mean_score = ("review_score", "mean")).reset_index().sort_values(by="mean_score", ascending=False)
 
 #Creamos la figura
-fig= plt.figure()
+fig_num_review_media= plt.figure()
 #Añadimos un subplot a la figura
-ax1 = fig.add_subplot(111)
+ax4 = fig_num_review_media.add_subplot(111)
 #twinx() sirve para tener dos ejes "y" en lugar de uno. Su "gemelo" en el lado contrario
-ax2 = ax1.twinx()
+ax5 = ax4.twinx()
 #Creamos los gráficos, indicando como eje x, común a ambos, los estados. Como eje y, cada gráfico tiene el suyo.
-ax1.bar(review_state["customer_state"],review_state["num_review"], color = "Teal")
-ax2.plot(review_state["customer_state"],review_state["mean_score"], color="Maroon")
+ax4.bar(review_state["customer_state"],review_state["num_review"], color = "Teal")
+ax5.plot(review_state["customer_state"],review_state["mean_score"], color="Maroon")
 
 #Añadimos el límite en el eje y del gráfico de línea en 5, dado que se puntúa entre 0 y 5. 
-ax2.set_ylim(0,  5)
+ax5.set_ylim(0,  5)
 #Indicamos que el eje y del gráfico de reviews va a la derecha
-ax1.yaxis.set_label_position("right")
+ax4.yaxis.set_label_position("right")
 #Movemos las etiquetas del eje al lado derecho.
-ax1.yaxis.tick_right()
+ax4.yaxis.tick_right()
 #Indicamos que el eje y del gráfico de medias va a la izquierda
-ax2.yaxis.set_label_position("left")
+ax5.yaxis.set_label_position("left")
 #Dejamos las etiquetas del eje en el lado izquierdo
-ax2.yaxis.tick_left()
+ax5.yaxis.tick_left()
 #Con spines podemos mostrar u ocultar los ejes del gráfico. En este caso, ocultamos (set_visible(False)) el eje superior ("top")para simplificar el gráfico
-ax1.spines['top'].set_visible(False)
-ax2.spines['top'].set_visible(False)
+ax4.spines['top'].set_visible(False)
+ax5.spines['top'].set_visible(False)
 
 #Añadimos título y etiquetas a los ejes
-fig.suptitle("Mean and number of reviews in each State")
-ax2.set_ylabel("Mean Score")
-ax1.set_ylabel("Number of reviews")
-ax1.set_xlabel("States")
+fig_num_review_media.suptitle("Mean and number of reviews in each State")
+ax5.set_ylabel("Mean Score")
+ax4.set_ylabel("Number of reviews")
+ax4.set_xlabel("States")
 
+plt.show()
