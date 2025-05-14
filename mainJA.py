@@ -257,10 +257,10 @@ if len(rango_fechas) == 2:
     solo_retrasados = clientes_estado_ciudad[clientes_estado_ciudad["dias_retraso_entrega"] > 0]
 
     # Realizamos las transformaciones necesarias en solo_retrasados
-    solo_retrasados.loc[:, "approved-purchase"] = (solo_retrasados["order_approved_at"] - solo_retrasados["order_purchase_timestamp"]).dt.days
-    solo_retrasados.loc[:, "delivered_carrier-approved"] = (solo_retrasados["order_delivered_carrier_date"] - solo_retrasados["order_approved_at"]).dt.days
-    solo_retrasados.loc[:, "estimated_delivery-delivered_carrier"] = (solo_retrasados["order_estimated_delivery_date"] - solo_retrasados["order_delivered_carrier_date"]).dt.days
-    solo_retrasados.loc[:, "delivered_customer-estimated_delivery"] = (solo_retrasados["order_delivered_customer_date"] - solo_retrasados["order_estimated_delivery_date"]).dt.days
+    solo_retrasados["approved-purchase"] = (solo_retrasados["order_approved_at"] - solo_retrasados["order_purchase_timestamp"]).dt.days
+    solo_retrasados["delivered_carrier-approved"] = (solo_retrasados["order_delivered_carrier_date"] - solo_retrasados["order_approved_at"]).dt.days
+    solo_retrasados["estimated_delivery-delivered_carrier"] = (solo_retrasados["order_estimated_delivery_date"] - solo_retrasados["order_delivered_carrier_date"]).dt.days
+    solo_retrasados["delivered_customer-estimated_delivery"] = (solo_retrasados["order_delivered_customer_date"] - solo_retrasados["order_estimated_delivery_date"]).dt.days
 
     fig_diferencia_aprobado_compra = px.box(solo_retrasados, y="approved-purchase", title="Diferencia Aprobado - Compra")
     
@@ -277,7 +277,6 @@ if len(rango_fechas) == 2:
     error_estimacion_fecha = solo_retrasados.groupby("delivered_customer-estimated_delivery")["order_id"].count().reset_index().sort_values(by="order_id", ascending=False)
     fig_error_estimacion_fecha = px.scatter(error_estimacion_fecha, x="order_id", y="delivered_customer-estimated_delivery", title="Error en Estimación de Fecha")
     
-
 
     #Reviews nuevas
     relacion_review_precio = df_ejercicio4.groupby("customer_state").agg(media_reviews = ("review_score", "mean"),
@@ -329,9 +328,7 @@ if len(rango_fechas) == 2:
     # Histograma de los precios
     fig_hist_precio = px.histogram(relacion_review_precio, x="media_precios", title="Histograma de Precios")
     
-    #Clientes nuevas graficas:
-    fig_pedidos_retraso_barras = px.bar(pedidos_tarde, x="customer_city", y="num_pedidos", color="customer_city", title="Relación de retrasos y pedidos totales por ciudad")
-    
+    #Clientes nuevas graficas: 
     # Gráfico de dispersión de cantidad de pedidos tarde vs. número de pedidos
     fig_tabla_porcent_total = go.Figure(data=go.Scatter(
         x=pedidos_tarde["cantidad_pedidos_tarde"],
@@ -346,7 +343,7 @@ if len(rango_fechas) == 2:
     fig_tabla_porcent_total.update_layout(title="Scatter: Retrasos en pedidos", xaxis_title="Cantidad de pedidos tarde", yaxis_title="Número de pedidos")
     
     # Media de retrasos por ciudad
-    fig_media_retraso_ciudad = px.bar(pedidos_tarde, y="customer_city", x="media_dias_tarde", orientation='h', title="Media de días de retraso por ciudad")
+    fig_media_retraso_ciudad = px.bar(pedidos_tarde, y="customer_city", x="media_dias_tarde", orientation='h', color="customer_city", title="Media de días de retraso por ciudad")
     
     # Pestañas
     tab_clientes, tab_pedidos, tab_reviews = st.tabs(["📊 Clientes", "📦 Pedidos", "⭐ Reviews"])
@@ -384,7 +381,6 @@ if len(rango_fechas) == 2:
         st.plotly_chart(fig_diferencia_entrega_estimacion)
         st.plotly_chart(fig_error_estimacion_fecha)
         st.plotly_chart(fig_relacion_pedidos_precio)
-        st.plotly_chart(fig_pedidos_retraso_barras)
         st.plotly_chart(fig_tabla_porcent_total)
         st.plotly_chart(fig_media_retraso_ciudad)
 
@@ -394,6 +390,5 @@ if len(rango_fechas) == 2:
         st.plotly_chart(fig_relacion_review_pedidos)
         st.plotly_chart(fig_hist_review)
         st.plotly_chart(fig_hist_precio)
-        st.plotly_chart(fig_num_review_media)
 else:
     st.warning("Selecciona un rango de fechas válido para visualizar los datos.")
