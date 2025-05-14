@@ -27,19 +27,25 @@ df_orders_filtrado = df_orders[["order_id", "customer_id", "order_purchase_times
 
 df_payments_filtrado = df_payments[["order_id", "payment_value"]]
 
-df_items_filtrado = df_items[["order_id", "shipping_limit_date"]]
+df_items_filtrado = df_items[["order_id"]]
 
 df_reviews_filtrado = df_reviews[["order_id", "review_id", "review_score"]]
 
 # Combinacion de los datasets, usando left join
 df_orders_customers = df_orders_filtrado.merge(df_customers_filtrado, left_on='customer_id', right_on='customer_id', how='left')
 df_orders_customers_payments = df_orders_customers.merge(df_payments_filtrado, left_on='order_id', right_on='order_id', how='left')
-df_orders_customers_payments_items = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
-df_orders_customers_payments_items_review = df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
+df_orders_customers_payments_items_review = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
+#df_orders_customers_payments_items_review = df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
 
 # Eliminar duplicados solo si son exactamente el mismo pedido
-#df_orders_customers_payments_items_review.drop_duplicates(subset=["order_id", "customer_id"], keep="first", inplace=True)
 df_orders_customers_payments_items_review.drop_duplicates()
+
+# Suma de los distintos tipos de pago de cada pedido
+payment_sum = df_orders_customers_payments_items_review.groupby('order_id')['payment_value'].sum()
+# Eliminamos la columna original (para evitar duplicados en el merge)
+df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop(columns='payment_value')
+# Hacemos el merge con la suma
+df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.merge(payment_sum, on='order_id', how='left')
 
 # Convertir columnas de fecha a tipo datetime
 columnas_fecha = [
@@ -47,8 +53,7 @@ columnas_fecha = [
     'order_approved_at',
     'order_delivered_carrier_date',
     'order_delivered_customer_date',
-    'order_estimated_delivery_date',
-    'shipping_limit_date'
+    'order_estimated_delivery_date'
 ]
 
 for columna in columnas_fecha:
@@ -71,7 +76,6 @@ df_orders_customers_payments_items_review = df_orders_customers_payments_items_r
 df_orders_customers_payments_items_review['order_approved_at'] = df_orders_customers_payments_items_review['order_approved_at'].fillna(pd.Timestamp('1900-12-31'))
 df_orders_customers_payments_items_review['order_delivered_carrier_date'] = df_orders_customers_payments_items_review['order_delivered_carrier_date'].fillna(pd.Timestamp('1900-12-31'))
 df_orders_customers_payments_items_review['order_delivered_customer_date'] = df_orders_customers_payments_items_review['order_delivered_customer_date'].fillna(pd.Timestamp('1900-12-31'))
-df_orders_customers_payments_items_review['shipping_limit_date'] = df_orders_customers_payments_items_review['shipping_limit_date'].fillna(pd.Timestamp('1900-12-31'))
 
 # Rellenado del único pedido con pago nulo
 df_orders_customers_payments_items_review.loc[
@@ -81,7 +85,7 @@ df_orders_customers_payments_items_review.loc[
 
 # Calcular la diferencia y extraer los días
 df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
-    df_orders_customers_payments_items_review['shipping_limit_date'] - df_orders_customers_payments_items_review['order_delivered_customer_date']
+    df_orders_customers_payments_items_review['order_estimated_delivery_date'] - df_orders_customers_payments_items_review['order_delivered_customer_date']
 ).dt.days
 
 # Si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
@@ -101,16 +105,18 @@ df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_paym
 #print(df_orders_customers_payments_items_review.isnull().sum())
 #print(df_orders_customers_payments_items_review)
 
-print(df_payments_filtrado[df_payments_filtrado['order_id'] == '28bbae6599b09d39ca406b747b6632b1'])
-print(df_orders_customers_payments[df_orders_customers_payments['order_id'] == '28bbae6599b09d39ca406b747b6632b1'])
-
-print(df_orders_customers_payments_items_review.dtypes)
+#es_unico = df_orders_customers_payments_items_review['order_id'].is_unique
+#print(f"¿Todos los order_id son únicos?: {es_unico}")
+#duplicados = df_orders_customers_payments_items_review['order_id'].duplicated().sum()
+#print(f"Número de order_id duplicados: {duplicados}")
+#order_id_duplicados = df_orders_customers_payments_items_review['order_id'][df_orders_customers_payments_items_review['order_id'].duplicated()]
+#print(order_id_duplicados)
 
 pedidos_por_cliente = df_orders_customers_payments_items_review.groupby("customer_id")["order_id"].count()
-# Mostrar los resultados, asegurando que ves la distribución de pedidos por cliente
-#print(pedidos_por_cliente.value_counts().sort_index())
-#print(pedidos_por_cliente.head())  # Revisa los primeros resultados
-df_orders_customers_payments_items_review.to_csv('df_orders_customs_payments_items_review.csv', index=False)
+# Mostrar los resultados, asegurando que se ve la distribución de pedidos por cliente
+print(pedidos_por_cliente.value_counts().sort_index())
+#print(pedidos_por_cliente.head()) 
+#df_orders_customers_payments_items_review.to_csv('df_orders_customs_payments_items_review.csv', index=False)
 
 '''
 #---------------------------------------------------------------------------
