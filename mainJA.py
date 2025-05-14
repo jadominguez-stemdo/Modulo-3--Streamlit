@@ -104,7 +104,7 @@ df_reviews_full = df_review_orders.merge(
 )
 
 df_reviews_full = df_reviews_full.merge(
-    df_orders_customers_payments_items_review[["order_id", "dias_retraso_entrega"]],
+    df_orders_customers_payments_items_review[["order_id", "dias_retraso_entrega", "payment_value"]],
     on="order_id",
     how="left"
 )
@@ -113,11 +113,13 @@ df_reviews_full = df_reviews_full.merge(
 df_reviews_full_sin_retraso = df_reviews_full[df_reviews_full["dias_retraso_entrega"] == 0]
 
 # Seleccionar columnas finales
-df_ejercicio4 = df_reviews_full_sin_retraso[["customer_state", "review_id", "review_score", "dias_retraso_entrega"]]
+df_ejercicio4 = df_reviews_full_sin_retraso[[
+    "customer_state", "review_id", "review_score", "dias_retraso_entrega", "payment_value", "order_id", "customer_id"
+]]
 
 # Mostrar resultados
-df_ejercicio4.to_csv('df_ejercicio4.csv', index=False)
-print(df_ejercicio4.head(50))
+#df_ejercicio4.to_csv('df_ejercicio4.csv', index=False)
+#print(df_ejercicio4.head(50))
 
 # Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
 #formato_fecha = "%Y-%m-%d %H:%M:%S"
@@ -137,82 +139,154 @@ print(df_ejercicio4.head(50))
 #order_id_duplicados = df_orders_customers_payments_items_review['order_id'][df_orders_customers_payments_items_review['order_id'].duplicated()]
 #print(order_id_duplicados)
 
-pedidos_por_cliente = df_orders_customers_payments_items_review.groupby("customer_id")["order_id"].count()
+#pedidos_por_cliente = df_orders_customers_payments_items_review.groupby("customer_id")["order_id"].count()
 # Mostrar los resultados, asegurando que se ve la distribución de pedidos por cliente
-print(pedidos_por_cliente.value_counts().sort_index())
+#print(pedidos_por_cliente.value_counts().sort_index())
 
 #Guardar resultados en un csv
 #df_orders_customers_payments_items_review.to_csv('df_orders_customs_payments_items_review.csv', index=False)
 
-'''
+
 #---------------------------------------------------------------------------
 import streamlit as st
 import plotly.express as px
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 # Cargar datos
 df = df_orders_customers_payments_items_review
 
 # Filtrar por rango de fechas
-st.title("Análisis de Clientes por Estado y Ciudad")
+st.title("Análisis de Olist Data-E Commerce")
 
 fecha_min = df['order_purchase_timestamp'].min()
 fecha_max = df['order_purchase_timestamp'].max()
+numCiudades = st.number_input("Indique el número de ciudades por estado que desea: ", step= 1)
 
 rango_fechas = st.date_input("Selecciona el rango de fechas:", [fecha_min, fecha_max])
 
 if len(rango_fechas) == 2:
     inicio, fin = pd.to_datetime(rango_fechas)
-    df = df[(df['order_purchase_timestamp'] >= inicio) & (df['order_purchase_timestamp'] <= fin)]
 
-    # Calculo de clientes por estado
-    clientes_por_estado = df.groupby("customer_state")['customer_id'].nunique().sort_values(ascending=False)
-    top_5_estados = clientes_por_estado.head(5)
+    # Filtrar por rango de fechas
+    df_filtrado_fecha = df[
+        (df['order_purchase_timestamp'] >= inicio) &
+        (df['order_purchase_timestamp'] <= fin)
+    ]
 
-    st.subheader("Top 5 Estados por Número de Clientes")
-    fig_top_estados = px.bar(top_5_estados, x=top_5_estados.index, y=top_5_estados.values,
-                              labels={'x': 'Estado', 'y': 'Nº de Clientes'}, color=top_5_estados.index)
-    st.plotly_chart(fig_top_estados)
-    
-    # Filtros dinámicos por estado y ciudad (top 10 ciudades con más clientes)
+    # Top 5 estados con más clientes
+    top_5_estados = df_filtrado_fecha.groupby("customer_state")['customer_id'].nunique().sort_values(ascending=False).head(5)
+
+    # Filtros dinámicos por estado y ciudad
     estados_seleccionados = st.multiselect("Selecciona los estados:", options=top_5_estados.index.tolist(), default=top_5_estados.index.tolist())
-    df_top_estados = df[df['customer_state'].isin(estados_seleccionados)]
-    
-    top_10_ciudades = df_top_estados.groupby("customer_city")['customer_id'].nunique().sort_values(ascending=False).head(10).index.tolist()
-    ciudades_seleccionadas = st.multiselect("Selecciona las ciudades:", options=top_10_ciudades, default=top_10_ciudades)
+    df_top_estados = df_filtrado_fecha[df_filtrado_fecha['customer_state'].isin(estados_seleccionados)]
 
-    df_top_estados = df_top_estados[df_top_estados['customer_city'].isin(ciudades_seleccionadas)]
+    top_ciudades = df_top_estados.groupby("customer_city")['customer_id'].nunique().sort_values(ascending=False).head(numCiudades).index.tolist()
+    ciudades_seleccionadas = st.multiselect("Selecciona las ciudades:", options=top_ciudades, default=top_ciudades)
 
-    total_pedidos = df_top_estados['order_id'].nunique()
+    clientes_estado_ciudad = df_top_estados[df_top_estados['customer_city'].isin(ciudades_seleccionadas)]
 
-    df_top_estados_clean = df_top_estados.drop_duplicates(subset=["order_id", "customer_id"])
-   # Calcular número de pedidos por cliente
-    df_ratio = df_top_estados_clean.groupby(["customer_state", "customer_city", "customer_id"])["order_id"].count().reset_index()
-    df_ratio.rename(columns={"order_id": "n_pedidos"}, inplace=True)
+    # Tabla con métricas por ciudad
+    agrupado = clientes_estado_ciudad.groupby(['customer_state', 'customer_city'])
+    clientes_por_ciudad = agrupado['customer_id'].nunique().reset_index(name='num_clientes')
+    pedidos_por_ciudad = agrupado['order_id'].nunique().reset_index(name='num_pedidos')
 
-    # Agrupar para calcular métricas finales
-    df_ratio_final = df_ratio.groupby(["customer_state", "customer_city"]).agg(
-        n_clientes=("customer_id", "nunique"),
-        n_pedidos=("n_pedidos", "sum")
-    ).reset_index()
+    tabla = pd.merge(clientes_por_ciudad, pedidos_por_ciudad, on=['customer_state', 'customer_city'])
+    tabla['porcentaje_pedidos'] = (tabla['num_pedidos'] / df_filtrado_fecha['order_id'].nunique()) * 100
+    tabla['ratio_pedidos_cliente'] = tabla['num_pedidos'] / tabla['num_clientes']
 
-    df_ratio_final["porcentaje_pedidos"] = (df_ratio_final["n_pedidos"] / total_pedidos * 100).round(2)
-    df_ratio_final["ratio_pedidos_cliente"] = (df_ratio_final["n_pedidos"] / df_ratio_final["n_clientes"]).round(2)
+    st.dataframe(tabla)
 
-    st.subheader("Tabla de Clientes, Pedidos y Ratios por Ciudad")
-    st.dataframe(df_ratio_final.sort_values(by=["customer_state", "n_clientes"], ascending=[True, False]))
-
-    st.subheader("Pedidos por Cliente (Ratio) - Ciudades Seleccionadas")
-    fig_ratio = px.bar(
-        df_ratio_final,
-        x="customer_city",
-        y="ratio_pedidos_cliente",
+    # Generar visualizaciones
+    clientes_estado_agrupado = clientes_estado_ciudad.groupby("customer_state")['customer_id'].nunique().reset_index(name="num_clientes")
+    clientes_estado_agrupado = clientes_estado_agrupado.sort_values(by="num_clientes", ascending=False)
+    fig_clientes_estado = px.bar(
+        clientes_estado_agrupado,
+        x="customer_state",
+        y="num_clientes",
         color="customer_state",
-        barmode="group",
-        labels={"ratio_pedidos_cliente": "Ratio de Pedidos por Cliente", "customer_city": "Ciudad"},
-        title="Ratio de Pedidos por Cliente en las Ciudades Seleccionadas"
+        title="Número de clientes por estado",
+        category_orders={"customer_state": clientes_estado_agrupado["customer_state"].tolist()}
     )
-    st.plotly_chart(fig_ratio)
+
+    fig_ratio = px.scatter(
+        tabla, x="customer_city", y="ratio_pedidos_cliente", color="customer_state",
+        size="num_clientes", hover_data=["num_pedidos", "porcentaje_pedidos"],
+        title="Ratio de pedidos por cliente por ciudad")
+
+    pedidos_clientes = clientes_estado_ciudad.groupby(["customer_state", "customer_city"]).agg(
+        count_orders=("order_id", "count"), count_customers=("customer_id", "nunique")
+    ).reset_index().sort_values(by="count_orders", ascending=False)
+
+    fig_bar_clientes_estado = px.bar(
+        pedidos_clientes, x="customer_state", y="count_customers", color="customer_city",
+        title="Clientes por ciudad y estado")
+
+    df_ejercicio4_filtrado = df_ejercicio4[df_ejercicio4['customer_state'].isin(estados_seleccionados)]
+    review_state = df_ejercicio4_filtrado.groupby("customer_state").agg(
+        num_review=("review_id", "count"), mean_score=("review_score", "mean")
+    ).reset_index().sort_values(by="mean_score", ascending=False)
+
+    fig_review = go.Figure()
+    fig_review.add_bar(x=review_state["customer_state"], y=review_state["num_review"], name="Número de reviews", marker_color="teal", yaxis="y1")
+    fig_review.add_trace(go.Scatter(x=review_state["customer_state"], y=review_state["mean_score"], name="Puntuación media", mode="lines+markers", marker_color="maroon", yaxis="y2"))
+    fig_review.update_layout(title="Reviews por estado", xaxis=dict(title="Estado"), yaxis=dict(title="Número de reviews"), yaxis2=dict(title="Puntuación media", overlaying="y", side="right", range=[0, 5]))
+
+    pedidos_tarde = clientes_estado_ciudad.groupby("customer_city").agg(
+        cantidad_pedidos_tarde=("dias_retraso_entrega", lambda x: (x > 0).sum()),
+        media_dias_tarde=("dias_retraso_entrega", lambda x: x[x > 0].mean()),
+        num_pedidos=("order_id", "count")
+    ).reset_index().sort_values(by="cantidad_pedidos_tarde", ascending=False).head(20)
+    pedidos_tarde["porcentaje_tarde"] = round(pedidos_tarde.cantidad_pedidos_tarde / pedidos_tarde.num_pedidos * 100, 2)
+
+    fig_retrasos = go.Figure()
+    fig_retrasos.add_trace(go.Bar(x=pedidos_tarde["customer_city"], y=pedidos_tarde["cantidad_pedidos_tarde"], name="Pedidos Tarde", marker_color='mediumseagreen'))
+    fig_retrasos.add_trace(go.Bar(x=pedidos_tarde["customer_city"], y=pedidos_tarde["num_pedidos"] - pedidos_tarde["cantidad_pedidos_tarde"], name="Pedidos a Tiempo", marker_color='skyblue'))
+    fig_retrasos.update_layout(barmode='stack', title="Pedidos tarde vs a tiempo por ciudad", xaxis_title="Ciudad", yaxis_title="Cantidad de pedidos")
+
+    fig_media_retraso = px.bar(
+        pedidos_tarde.sort_values(by="media_dias_tarde", ascending=True),
+        x="media_dias_tarde", y="customer_city", orientation="h",
+        title="Media de días de retraso por ciudad", color="media_dias_tarde", color_continuous_scale="Reds")
+
+    tabla_estado_ciudad = df_top_estados.groupby(["customer_state", "customer_city"])["customer_id"].count().reset_index()
+    tabla_estado_ciudad.rename(columns={"customer_id": "n_clientes"}, inplace=True)
+
+    # Pestañas
+    tab_clientes, tab_pedidos, tab_reviews = st.tabs(["📊 Clientes", "📦 Pedidos", "⭐ Reviews"])
+
+    with tab_clientes:
+        st.plotly_chart(fig_clientes_estado, use_container_width=True)
+
+        st.subheader("Top ciudades con más clientes por estado")
+        for i, estado in enumerate(estados_seleccionados):
+            top_ciudades_estado = (
+                tabla_estado_ciudad[tabla_estado_ciudad['customer_state'] == estado]
+                .sort_values(by="n_clientes", ascending=False).head(int(numCiudades))
+            )
+            fig_bar = px.bar(
+                top_ciudades_estado, x="n_clientes", y="customer_city", orientation="h",
+                title=f"Top {numCiudades} ciudades por clientes en {estado}", color="n_clientes", color_continuous_scale="Blues"
+            )
+            st.plotly_chart(fig_bar, use_container_width=True, key=f"bar_{estado}_{i}")
+
+        st.subheader("Dispersión de clientes por estado y ciudad")
+        fig_scatter = px.scatter(
+            tabla_estado_ciudad[tabla_estado_ciudad["customer_state"].isin(estados_seleccionados)],
+            x="customer_state", y="customer_city", size="n_clientes", color="customer_state",
+            title="Distribución de clientes por estado y ciudad", hover_data=["n_clientes"]
+        )
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
+    with tab_pedidos:
+        st.plotly_chart(fig_ratio, use_container_width=True)
+        st.plotly_chart(fig_bar_clientes_estado, use_container_width=True)
+        st.plotly_chart(fig_retrasos, use_container_width=True)
+        st.plotly_chart(fig_media_retraso, use_container_width=True)
+
+    with tab_reviews:
+        st.plotly_chart(fig_review, use_container_width=True)
+
 
 else:
     st.warning("Selecciona un rango de fechas válido para visualizar los datos.")
-'''
