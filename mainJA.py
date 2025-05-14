@@ -76,8 +76,8 @@ df_orders_customers_payments_items_review['shipping_limit_date'] = df_orders_cus
 # Rellenado del único pedido con pago nulo
 df_orders_customers_payments_items_review.loc[
     df_orders_customers_payments_items_review['order_id'] == 'bfbd0f9bdef84302105ad712db648a6c',
-    ['payment_sequential', 'payment_value']
-] = [1, 47.82]
+    ['payment_value']
+] = [47.82]
 
 # Calcular la diferencia y extraer los días
 df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
