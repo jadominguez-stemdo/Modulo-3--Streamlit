@@ -18,7 +18,6 @@ df_orders = pd.read_csv(ruta_archivo, encoding="utf-8")
 df_customers = pd.read_csv(ruta_archivo2, encoding="utf-8")
 df_items = pd.read_csv(ruta_archivo3, encoding="utf-8")
 df_reviews = pd.read_csv(ruta_archivo4, encoding="utf-8")
-#print(df_reviews.head(35))
 df_payments = pd.read_csv(ruta_archivo5, encoding="utf-8")
 
 # Filtrar las columnas relevantes
@@ -26,7 +25,7 @@ df_customers_filtrado = df_customers[["customer_id", "customer_city", "customer_
 
 df_orders_filtrado = df_orders[["order_id", "customer_id", "order_purchase_timestamp", "order_approved_at", "order_delivered_carrier_date", "order_estimated_delivery_date", "order_delivered_customer_date"]]
 
-df_payments_filtrado = df_payments[["order_id", "payment_sequential", "payment_value"]]
+df_payments_filtrado = df_payments[["order_id", "payment_value"]]
 
 df_items_filtrado = df_items[["order_id", "shipping_limit_date"]]
 
@@ -38,8 +37,9 @@ df_orders_customers_payments = df_orders_customers.merge(df_payments_filtrado, l
 df_orders_customers_payments_items = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
 df_orders_customers_payments_items_review = df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
 
-# Eliminacion de duplicados
-df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop_duplicates()
+# Eliminar duplicados solo si son exactamente el mismo pedido
+#df_orders_customers_payments_items_review.drop_duplicates(subset=["order_id", "customer_id"], keep="first", inplace=True)
+df_orders_customers_payments_items_review.drop_duplicates()
 
 # Convertir columnas de fecha a tipo datetime
 columnas_fecha = [
@@ -64,7 +64,6 @@ primer_año_por_cliente = (
 df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.merge(primer_año_por_cliente, on='customer_id', how='left')
 
 # Conteo de nulos y eliminacion de duplicados
-#print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review["payment_value"].isnull()])
 #print(df_orders_customers_payments_items_review.isnull().sum())
 df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop_duplicates()
 
@@ -85,67 +84,103 @@ df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
     df_orders_customers_payments_items_review['shipping_limit_date'] - df_orders_customers_payments_items_review['order_delivered_customer_date']
 ).dt.days
 
-# Aplicar lógica: si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
+# Si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
 df_orders_customers_payments_items_review['dias_retraso_entrega'] = df_orders_customers_payments_items_review['dias_retraso_entrega'].apply(lambda x: 0 if x >= 0 else abs(x))
 
 df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['dias_retraso_entrega'] > 0]
 #print(df_retrasos.head(30))
 
 # Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
-formato_fecha = "%Y-%m-%d %H:%M:%S"
+#formato_fecha = "%Y-%m-%d %H:%M:%S"
 
-for columna in columnas_fecha:
-    df_orders_customers_payments_items_review[columna] = df_orders_customers_payments_items_review[columna].dt.strftime(formato_fecha)
+#for columna in columnas_fecha:
+    #df_orders_customers_payments_items_review[columna] = df_orders_customers_payments_items_review[columna].dt.strftime(formato_fecha)
 
 #print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review["payment_value"].isnull()])
-print(df_orders_customers_payments_items_review.isnull().any().any())
-print(df_orders_customers_payments_items_review.isnull().sum())
+#print(df_orders_customers_payments_items_review.isnull().any().any())
+#print(df_orders_customers_payments_items_review.isnull().sum())
 #print(df_orders_customers_payments_items_review)
-#print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['order_id'] == 'e6cc57f923c4dab2222b8c9aa8742eea'])
 
+print(df_payments_filtrado[df_payments_filtrado['order_id'] == '28bbae6599b09d39ca406b747b6632b1'])
+print(df_orders_customers_payments[df_orders_customers_payments['order_id'] == '28bbae6599b09d39ca406b747b6632b1'])
+
+print(df_orders_customers_payments_items_review.dtypes)
+
+pedidos_por_cliente = df_orders_customers_payments_items_review.groupby("customer_id")["order_id"].count()
+# Mostrar los resultados, asegurando que ves la distribución de pedidos por cliente
+#print(pedidos_por_cliente.value_counts().sort_index())
+#print(pedidos_por_cliente.head())  # Revisa los primeros resultados
+df_orders_customers_payments_items_review.to_csv('df_orders_customs_payments_items_review.csv', index=False)
 
 '''
-# Calculo de clientes por estado
-clientes_por_estado = df_orders_customers.groupby("customer_state")["customer_id"].nunique().sort_values(ascending=False)
-# Top 5 estados con mas clientes
-top_5_estados = clientes_por_estado.head(5)
-print(top_5_estados)
-
-df_top_estados = df_orders_customers[df_orders_customers['customer_state'].isin(top_5_estados.index)]
-
-# Agrupar por estado y ciudad, contando clientes
-tabla_estado_ciudad = df_top_estados.groupby(["customer_state", "customer_city"])["customer_id"].count().reset_index()
-tabla_estado_ciudad.rename(columns={"customer_id": "n_clientes"}, inplace=True)
-print(tabla_estado_ciudad)
-#print(tabla_estado_ciudad[tabla_estado_ciudad['customer_city'] == "sao paulo"])
-print(df_orders_customers.dtypes)
-
-# Calcula el año de la primera compra de cada cliente y lo añade al dataframe original
-primer_año_por_cliente = (
-    df_orders_customers.groupby('customer_id')['order_purchase_timestamp']
-    .min()
-    .dt.year
-    .rename('primer_año_compra')
-)
-df_orders_customers = df_orders_customers.merge(primer_año_por_cliente, on='customer_id', how='left')
-print(df_orders_customers)
-
-
-#Creacion del formulario con filtros para el estado, ciudad y año de compra
+#---------------------------------------------------------------------------
 import streamlit as st
+import plotly.express as px
 
-# Título de la app
-st.title("Formulario de Registro")
+# Cargar datos
+df = df_orders_customers_payments_items_review
 
-# Usamos un formulario con 'with' para agrupar los inputs
-with st.form("formulario_registro"):
-    estado = st.text_input("Estado")
-    ciudad = st.text_input("Ciudad")
-    año = st.number_input("Año", min_value=0, max_value=120, step=1)
-    genero = st.selectbox("Género", ["Seleccione...", "Masculino", "Femenino", "Otro"])
-    acepta = st.checkbox("Acepto los términos y condiciones")
+# Filtrar por rango de fechas
+st.title("Análisis de Clientes por Estado y Ciudad")
 
-    # Botón para enviar el formulario
-    enviar = st.form_submit_button("Enviar")
+fecha_min = df['order_purchase_timestamp'].min()
+fecha_max = df['order_purchase_timestamp'].max()
 
+rango_fechas = st.date_input("Selecciona el rango de fechas:", [fecha_min, fecha_max])
+
+if len(rango_fechas) == 2:
+    inicio, fin = pd.to_datetime(rango_fechas)
+    df = df[(df['order_purchase_timestamp'] >= inicio) & (df['order_purchase_timestamp'] <= fin)]
+
+    # Calculo de clientes por estado
+    clientes_por_estado = df.groupby("customer_state")['customer_id'].nunique().sort_values(ascending=False)
+    top_5_estados = clientes_por_estado.head(5)
+
+    st.subheader("Top 5 Estados por Número de Clientes")
+    fig_top_estados = px.bar(top_5_estados, x=top_5_estados.index, y=top_5_estados.values,
+                              labels={'x': 'Estado', 'y': 'Nº de Clientes'}, color=top_5_estados.index)
+    st.plotly_chart(fig_top_estados)
+    
+    # Filtros dinámicos por estado y ciudad (top 10 ciudades con más clientes)
+    estados_seleccionados = st.multiselect("Selecciona los estados:", options=top_5_estados.index.tolist(), default=top_5_estados.index.tolist())
+    df_top_estados = df[df['customer_state'].isin(estados_seleccionados)]
+    
+    top_10_ciudades = df_top_estados.groupby("customer_city")['customer_id'].nunique().sort_values(ascending=False).head(10).index.tolist()
+    ciudades_seleccionadas = st.multiselect("Selecciona las ciudades:", options=top_10_ciudades, default=top_10_ciudades)
+
+    df_top_estados = df_top_estados[df_top_estados['customer_city'].isin(ciudades_seleccionadas)]
+
+    total_pedidos = df_top_estados['order_id'].nunique()
+
+    df_top_estados_clean = df_top_estados.drop_duplicates(subset=["order_id", "customer_id"])
+   # Calcular número de pedidos por cliente
+    df_ratio = df_top_estados_clean.groupby(["customer_state", "customer_city", "customer_id"])["order_id"].count().reset_index()
+    df_ratio.rename(columns={"order_id": "n_pedidos"}, inplace=True)
+
+    # Agrupar para calcular métricas finales
+    df_ratio_final = df_ratio.groupby(["customer_state", "customer_city"]).agg(
+        n_clientes=("customer_id", "nunique"),
+        n_pedidos=("n_pedidos", "sum")
+    ).reset_index()
+
+    df_ratio_final["porcentaje_pedidos"] = (df_ratio_final["n_pedidos"] / total_pedidos * 100).round(2)
+    df_ratio_final["ratio_pedidos_cliente"] = (df_ratio_final["n_pedidos"] / df_ratio_final["n_clientes"]).round(2)
+
+    st.subheader("Tabla de Clientes, Pedidos y Ratios por Ciudad")
+    st.dataframe(df_ratio_final.sort_values(by=["customer_state", "n_clientes"], ascending=[True, False]))
+
+    st.subheader("Pedidos por Cliente (Ratio) - Ciudades Seleccionadas")
+    fig_ratio = px.bar(
+        df_ratio_final,
+        x="customer_city",
+        y="ratio_pedidos_cliente",
+        color="customer_state",
+        barmode="group",
+        labels={"ratio_pedidos_cliente": "Ratio de Pedidos por Cliente", "customer_city": "Ciudad"},
+        title="Ratio de Pedidos por Cliente en las Ciudades Seleccionadas"
+    )
+    st.plotly_chart(fig_ratio)
+
+else:
+    st.warning("Selecciona un rango de fechas válido para visualizar los datos.")
 '''
