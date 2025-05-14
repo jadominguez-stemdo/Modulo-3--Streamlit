@@ -169,7 +169,7 @@ if len(rango_fechas) == 2:
     inicio, fin = pd.to_datetime(rango_fechas)
 
     # Filtrar por rango de fechas
-    df_filtrado_fecha = df[
+    df_filtrado_fecha = df[ 
         (df['order_purchase_timestamp'] >= inicio) &
         (df['order_purchase_timestamp'] <= fin)
     ]
@@ -252,6 +252,102 @@ if len(rango_fechas) == 2:
     tabla_estado_ciudad = df_top_estados.groupby(["customer_state", "customer_city"])["customer_id"].count().reset_index()
     tabla_estado_ciudad.rename(columns={"customer_id": "n_clientes"}, inplace=True)
 
+    #Nuevas gráficas pedidos
+    # Filtrar solo los retrasos de entrega en el DataFrame de clientes seleccionados
+    solo_retrasados = clientes_estado_ciudad[clientes_estado_ciudad["dias_retraso_entrega"] > 0]
+
+    # Realizamos las transformaciones necesarias en solo_retrasados
+    solo_retrasados.loc[:, "approved-purchase"] = (solo_retrasados["order_approved_at"] - solo_retrasados["order_purchase_timestamp"]).dt.days
+    solo_retrasados.loc[:, "delivered_carrier-approved"] = (solo_retrasados["order_delivered_carrier_date"] - solo_retrasados["order_approved_at"]).dt.days
+    solo_retrasados.loc[:, "estimated_delivery-delivered_carrier"] = (solo_retrasados["order_estimated_delivery_date"] - solo_retrasados["order_delivered_carrier_date"]).dt.days
+    solo_retrasados.loc[:, "delivered_customer-estimated_delivery"] = (solo_retrasados["order_delivered_customer_date"] - solo_retrasados["order_estimated_delivery_date"]).dt.days
+
+    fig_diferencia_aprobado_compra = px.box(solo_retrasados, y="approved-purchase", title="Diferencia Aprobado - Compra")
+    
+    # Boxplot de diferencia entre entrega en almacén y aprobado
+    fig_diferencia_almacen_aprobado = px.box(solo_retrasados, y="delivered_carrier-approved", title="Diferencia Entrega Almacén - Aprobado")
+    
+    # Boxplot de diferencia entre entrega estimada y entrega en almacén
+    fig_diferencia_entrega_estimada_almacen = px.box(solo_retrasados, y="estimated_delivery-delivered_carrier", title="Diferencia Entrega Estimada - Almacén")
+    
+    # Boxplot de diferencia entre entrega al cliente y estimación de entrega
+    fig_diferencia_entrega_estimacion = px.box(solo_retrasados, y="delivered_customer-estimated_delivery", title="Diferencia Entrega al Cliente - Estimación de Entrega")
+    
+    # Scatterplot de error en estimación de fecha
+    error_estimacion_fecha = solo_retrasados.groupby("delivered_customer-estimated_delivery")["order_id"].count().reset_index().sort_values(by="order_id", ascending=False)
+    fig_error_estimacion_fecha = px.scatter(error_estimacion_fecha, x="order_id", y="delivered_customer-estimated_delivery", title="Error en Estimación de Fecha")
+    
+
+
+    #Reviews nuevas
+    relacion_review_precio = df_ejercicio4.groupby("customer_state").agg(media_reviews = ("review_score", "mean"),
+                                            media_precios = ("payment_value", "mean"),
+                                            num_pedidos = ("order_id", "count")).reset_index().sort_values(by="media_reviews", ascending=False)
+    # Número de reviews y score medio por estado
+    fig_num_review_media = go.Figure()
+
+    # Gráfico de barras para número de reviews
+    fig_num_review_media.add_trace(go.Bar(
+        x=review_state["customer_state"],
+        y=review_state["num_review"],
+        name="Número de Reviews",
+        marker_color="teal"
+    ))
+
+    # Gráfico de línea para score medio
+    fig_num_review_media.add_trace(go.Scatter(
+        x=review_state["customer_state"],
+        y=review_state["mean_score"],
+        name="Score Medio",
+        mode='lines+markers',
+        line=dict(color='maroon')
+    ))
+
+    fig_num_review_media.update_layout(
+        title="Número y media de reviews por Estado",
+        xaxis_title="Estados",
+        yaxis_title="Número de Reviews",
+        yaxis2=dict(
+            title="Score Medio",
+            overlaying='y',
+            side='right'
+        )
+    ) 
+
+    # Relación entre review y precio
+    fig_relacion_review_precio = px.scatter(relacion_review_precio, x="media_reviews", y="media_precios", title="Relación entre Reviews y Precio")
+    
+    # Relación entre número de pedidos y precio
+    fig_relacion_pedidos_precio = px.scatter(relacion_review_precio, x="num_pedidos", y="media_precios", title="Relación entre Pedidos y Precio")
+    
+    # Relación entre reviews y número de pedidos
+    fig_relacion_review_pedidos = px.scatter(relacion_review_precio, x="media_reviews", y="num_pedidos", title="Relación entre Reviews y Pedidos")
+    
+    # Histograma de las reviews
+    fig_hist_review = px.histogram(relacion_review_precio, x="media_reviews", title="Histograma de Reviews")
+   
+    # Histograma de los precios
+    fig_hist_precio = px.histogram(relacion_review_precio, x="media_precios", title="Histograma de Precios")
+    
+    #Clientes nuevas graficas:
+    fig_pedidos_retraso_barras = px.bar(pedidos_tarde, x="customer_city", y="num_pedidos", color="customer_city", title="Relación de retrasos y pedidos totales por ciudad")
+    
+    # Gráfico de dispersión de cantidad de pedidos tarde vs. número de pedidos
+    fig_tabla_porcent_total = go.Figure(data=go.Scatter(
+        x=pedidos_tarde["cantidad_pedidos_tarde"],
+        y=pedidos_tarde["num_pedidos"],
+        mode="markers",
+        marker=dict(
+            size=pedidos_tarde["porcentaje_tarde"],
+            color=pd.Categorical(pedidos_tarde["customer_city"]).codes,
+            colorscale="Rainbow"
+        )
+    ))
+    fig_tabla_porcent_total.update_layout(title="Scatter: Retrasos en pedidos", xaxis_title="Cantidad de pedidos tarde", yaxis_title="Número de pedidos")
+    
+    # Media de retrasos por ciudad
+    fig_media_retraso_ciudad = px.bar(pedidos_tarde, y="customer_city", x="media_dias_tarde", orientation='h', title="Media de días de retraso por ciudad")
+    
     # Pestañas
     tab_clientes, tab_pedidos, tab_reviews = st.tabs(["📊 Clientes", "📦 Pedidos", "⭐ Reviews"])
 
@@ -277,16 +373,27 @@ if len(rango_fechas) == 2:
             title="Distribución de clientes por estado y ciudad", hover_data=["n_clientes"]
         )
         st.plotly_chart(fig_scatter, use_container_width=True)
-
+        
     with tab_pedidos:
         st.plotly_chart(fig_ratio, use_container_width=True)
-        st.plotly_chart(fig_bar_clientes_estado, use_container_width=True)
         st.plotly_chart(fig_retrasos, use_container_width=True)
         st.plotly_chart(fig_media_retraso, use_container_width=True)
+        st.plotly_chart(fig_diferencia_aprobado_compra)
+        st.plotly_chart(fig_diferencia_almacen_aprobado)
+        st.plotly_chart(fig_diferencia_entrega_estimada_almacen)
+        st.plotly_chart(fig_diferencia_entrega_estimacion)
+        st.plotly_chart(fig_error_estimacion_fecha)
+        st.plotly_chart(fig_relacion_pedidos_precio)
+        st.plotly_chart(fig_pedidos_retraso_barras)
+        st.plotly_chart(fig_tabla_porcent_total)
+        st.plotly_chart(fig_media_retraso_ciudad)
 
     with tab_reviews:
         st.plotly_chart(fig_review, use_container_width=True)
-
-
+        st.plotly_chart(fig_relacion_review_precio)      
+        st.plotly_chart(fig_relacion_review_pedidos)
+        st.plotly_chart(fig_hist_review)
+        st.plotly_chart(fig_hist_precio)
+        st.plotly_chart(fig_num_review_media)
 else:
     st.warning("Selecciona un rango de fechas válido para visualizar los datos.")
