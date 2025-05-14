@@ -35,7 +35,6 @@ df_reviews_filtrado = df_reviews[["order_id", "review_id", "review_score"]]
 df_orders_customers = df_orders_filtrado.merge(df_customers_filtrado, left_on='customer_id', right_on='customer_id', how='left')
 df_orders_customers_payments = df_orders_customers.merge(df_payments_filtrado, left_on='order_id', right_on='order_id', how='left')
 df_orders_customers_payments_items_review = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
-#df_orders_customers_payments_items_review = df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
 
 # Eliminar duplicados solo si son exactamente el mismo pedido
 df_orders_customers_payments_items_review.drop_duplicates()
@@ -91,8 +90,34 @@ df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
 # Si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
 df_orders_customers_payments_items_review['dias_retraso_entrega'] = df_orders_customers_payments_items_review['dias_retraso_entrega'].apply(lambda x: 0 if x >= 0 else abs(x))
 
-df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['dias_retraso_entrega'] > 0]
-#print(df_retrasos.head(30))
+# Combinación de datasets para el ejercicio 4
+df_review_orders = df_reviews.merge(
+    df_orders[["order_id", "customer_id"]],
+    on="order_id",
+    how="left"
+)
+
+df_reviews_full = df_review_orders.merge(
+    df_customers[["customer_id", "customer_state"]],
+    on="customer_id",
+    how="left"
+)
+
+df_reviews_full = df_reviews_full.merge(
+    df_orders_customers_payments_items_review[["order_id", "dias_retraso_entrega"]],
+    on="order_id",
+    how="left"
+)
+
+# Filtrar solo los pedidos sin retraso
+df_reviews_full_sin_retraso = df_reviews_full[df_reviews_full["dias_retraso_entrega"] == 0]
+
+# Seleccionar columnas finales
+df_ejercicio4 = df_reviews_full_sin_retraso[["customer_state", "review_id", "review_score", "dias_retraso_entrega"]]
+
+# Mostrar resultados
+df_ejercicio4.to_csv('df_ejercicio4.csv', index=False)
+print(df_ejercicio4.head(50))
 
 # Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
 #formato_fecha = "%Y-%m-%d %H:%M:%S"
@@ -115,7 +140,8 @@ df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_paym
 pedidos_por_cliente = df_orders_customers_payments_items_review.groupby("customer_id")["order_id"].count()
 # Mostrar los resultados, asegurando que se ve la distribución de pedidos por cliente
 print(pedidos_por_cliente.value_counts().sort_index())
-#print(pedidos_por_cliente.head()) 
+
+#Guardar resultados en un csv
 #df_orders_customers_payments_items_review.to_csv('df_orders_customs_payments_items_review.csv', index=False)
 
 '''
