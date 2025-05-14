@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-
+import numpy as np
 pd.set_option('display.max_columns', None)
 
 #1. **Representa** una clasificación del nº de clientes por estado (Si consideras que hay demasiados estados representa el top 5). 
@@ -22,27 +22,32 @@ df_items = pd.read_csv(ruta_archivo3, encoding="utf-8")
 df_reviews = pd.read_csv(ruta_archivo4, encoding="utf-8")
 df_payments = pd.read_csv(ruta_archivo5, encoding="utf-8")
 
-
 # Filtrar las columnas relevantes
 df_customers_filtrado = df_customers[["customer_id", "customer_city", "customer_state"]]
-#print(df_customers_filtrado)
 
 df_orders_filtrado = df_orders[["order_id", "customer_id", "order_purchase_timestamp", "order_approved_at", "order_delivered_carrier_date", "order_estimated_delivery_date", "order_delivered_customer_date"]]
-#print(df_orders_filtrado)
 
-df_payments_filtrado = df_payments[["order_id", "payment_sequential", "payment_value"]]
+df_payments_filtrado = df_payments[["order_id", "payment_value"]]
 
-df_items_filtrado = df_items[["order_id", "shipping_limit_date"]]
+df_items_filtrado = df_items[["order_id"]]
 
 df_reviews_filtrado = df_reviews[["order_id", "review_id", "review_score"]]
-
 
 # Combinacion de los datasets, usando left join
 df_orders_customers = df_orders_filtrado.merge(df_customers_filtrado, left_on='customer_id', right_on='customer_id', how='left')
 df_orders_customers_payments = df_orders_customers.merge(df_payments_filtrado, left_on='order_id', right_on='order_id', how='left')
-df_orders_customers_payments_items = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
-df_orders_customers_payments_items_review =df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
+df_orders_customers_payments_items_review = df_orders_customers_payments.merge(df_items_filtrado, left_on='order_id', right_on='order_id', how='left')
+#df_orders_customers_payments_items_review = df_orders_customers_payments_items.merge(df_reviews_filtrado, left_on='order_id', right_on='order_id', how='left')
 
+# Eliminar duplicados solo si son exactamente el mismo pedido
+df_orders_customers_payments_items_review.drop_duplicates()
+
+# Suma de los distintos tipos de pago de cada pedido
+payment_sum = df_orders_customers_payments_items_review.groupby('order_id')['payment_value'].sum()
+# Eliminamos la columna original (para evitar duplicados en el merge)
+df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop(columns='payment_value')
+# Hacemos el merge con la suma
+df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.merge(payment_sum, on='order_id', how='left')
 
 # Convertir columnas de fecha a tipo datetime
 columnas_fecha = [
@@ -65,15 +70,8 @@ primer_año_por_cliente = (
 )
 df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.merge(primer_año_por_cliente, on='customer_id', how='left')
 
-# Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
-formato_fecha = "%Y-%m-%d %H:%M:%S"
-
-for columna in columnas_fecha:
-    df_orders_customers_payments_items_review[columna] = df_orders_customers_payments_items_review[columna].dt.strftime(formato_fecha)
-
 # Conteo de nulos y eliminacion de duplicados
-print(df_orders_customers_payments_items_review.isnull().any().any())
-print(df_orders_customers_payments_items_review.isnull().sum())
+#print(df_orders_customers_payments_items_review.isnull().sum())
 df_orders_customers_payments_items_review = df_orders_customers_payments_items_review.drop_duplicates()
 
 # Rellenar fechas nulas con una fecha falsa, para su posterior deteccion en el analisis
@@ -81,9 +79,23 @@ df_orders_customers_payments_items_review['order_approved_at'] = df_orders_custo
 df_orders_customers_payments_items_review['order_delivered_carrier_date'] = df_orders_customers_payments_items_review['order_delivered_carrier_date'].fillna(pd.Timestamp('1900-12-31'))
 df_orders_customers_payments_items_review['order_delivered_customer_date'] = df_orders_customers_payments_items_review['order_delivered_customer_date'].fillna(pd.Timestamp('1900-12-31'))
 
-print(df_orders_customers_payments_items_review.isnull().any().any())
-print(df_orders_customers_payments_items_review.isnull().sum())
-print(df_orders_customers_payments_items_review)
+# Rellenado del único pedido con pago nulo
+df_orders_customers_payments_items_review.loc[
+    df_orders_customers_payments_items_review['order_id'] == 'bfbd0f9bdef84302105ad712db648a6c',
+    ['payment_value']
+] = [47.82]
+
+# Calcular la diferencia y extraer los días
+df_orders_customers_payments_items_review['dias_retraso_entrega'] = (
+    df_orders_customers_payments_items_review['order_estimated_delivery_date'] - df_orders_customers_payments_items_review['order_delivered_customer_date']
+).dt.days
+
+# Si la diferencia es >= 0, poner 0; si es < 0, poner valor absoluto
+df_orders_customers_payments_items_review['dias_retraso_entrega'] = df_orders_customers_payments_items_review['dias_retraso_entrega'].apply(lambda x: 0 if x >= 0 else abs(x))
+
+df_retrasos = df_orders_customers_payments_items_review[df_orders_customers_payments_items_review['dias_retraso_entrega'] > 0]
+
+
 
 # Calculo de clientes por estado
 clientes_por_estado = df_orders_customers.groupby("customer_state")["customer_id"].nunique().sort_values(ascending=False)
@@ -162,9 +174,30 @@ print(pedidos_clientes)
 #plt.plot(pedidos_clientes["count_orders"], pedidos_clientes["count_customer"])
 #plt.pie(pedidos_clientes["count_customer"])
 #plt.boxplot(x=pedidos_clientes["count_customer"])
-plt.hist(pedidos_clientes["count_orders"], bins=20)
-plt.show()
+#plt.hist(pedidos_clientes["count_orders"], bins=20)
+
 #3. nº pedidos tarde por ciudad. % respecto al total de pedidos por ciudad. Tiempo medio de días tarde.
+#Creamos df agrupando ciudades y creando dos columnas, una con la cantidad de pedidos retrasados y otra con el número de pedidos por ciudad.
+pedidos_tarde =df_orders_customers_payments_items_review.groupby("customer_city").agg(
+    cantidad_pedidos_tarde = ("dias_retraso_entrega", lambda x: (x > 0).sum()),
+    num_pedidos =("order_id", "count")).reset_index().sort_values(by="cantidad_pedidos_tarde", ascending=False).head(20)
+#Añadimos una columna con el porcentaje de pedidos tarde.
+pedidos_tarde["porcentaje_tarde"] = round(pedidos_tarde.cantidad_pedidos_tarde/pedidos_tarde.num_pedidos*100, 2)
+print(pedidos_tarde)
+
+#Creamos la figura
+fig, ax= plt.subplots()
+
+#Creamos ambas barras, apiladas
+retrasos = ax.bar(pedidos_tarde["customer_city"], pedidos_tarde["cantidad_pedidos_tarde"], label = "cantidad_pedidos_tarde", facecolor = 'mediumseagreen' )
+pedidos = ax.bar(pedidos_tarde["customer_city"], pedidos_tarde["num_pedidos"], bottom=pedidos_tarde["cantidad_pedidos_tarde"], label = "num_pedidos", facecolor= 'xkcd:sky blue')
+#Añadimos titulo y etiquetas
+ax.legend()
+ax.bar_label(retrasos, padding=0)
+ax.bar_label(pedidos, padding=3)
+fig.suptitle("Relación de retrasos y pedidos totales por ciudad")
+
+plt.show()
 
 
 #4. nº de review por stado y score medio en cada una
