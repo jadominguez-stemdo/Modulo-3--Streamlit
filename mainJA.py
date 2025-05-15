@@ -2,10 +2,8 @@ import pandas as pd
 import os
 pd.set_option('display.max_columns', None)
 
-#1. **Representa** una clasificación del nº de clientes por estado (Si consideras que hay demasiados estados representa el top 5). 
-# Paso siguiente crea una tabla donde se representen los estados, las ciudades que pertenecen a esos estados y el numero de clientes en esas ciudades. 
-# Ademas de eso, la tabla y todos los graficos representados deberan de ser dinamicos respecto a la fecha
-
+# EDA (Análisis exploratorio de datos), ETL (Limpieza, transformación y carga)
+# -------------------------------------------------------------------------------
 script_dir = os.path.dirname(__file__)
 
 ruta_archivo = os.path.join(script_dir, 'recursos/Olist_Data/olist_orders_dataset.csv')
@@ -116,35 +114,6 @@ df_reviews_full_sin_retraso = df_reviews_full[df_reviews_full["dias_retraso_entr
 df_ejercicio4 = df_reviews_full_sin_retraso[[
     "customer_state", "review_id", "review_score", "dias_retraso_entrega", "payment_value", "order_id", "customer_id"
 ]]
-
-# Mostrar resultados
-#df_ejercicio4.to_csv('df_ejercicio4.csv', index=False)
-#print(df_ejercicio4.head(50))
-
-# Formatear todas las columnas de fecha al mismo formato: "YYYY-MM-DD HH:MM:SS"
-#formato_fecha = "%Y-%m-%d %H:%M:%S"
-
-#for columna in columnas_fecha:
-    #df_orders_customers_payments_items_review[columna] = df_orders_customers_payments_items_review[columna].dt.strftime(formato_fecha)
-
-#print(df_orders_customers_payments_items_review[df_orders_customers_payments_items_review["payment_value"].isnull()])
-#print(df_orders_customers_payments_items_review.isnull().any().any())
-#print(df_orders_customers_payments_items_review.isnull().sum())
-#print(df_orders_customers_payments_items_review)
-
-#es_unico = df_orders_customers_payments_items_review['order_id'].is_unique
-#print(f"¿Todos los order_id son únicos?: {es_unico}")
-#duplicados = df_orders_customers_payments_items_review['order_id'].duplicated().sum()
-#print(f"Número de order_id duplicados: {duplicados}")
-#order_id_duplicados = df_orders_customers_payments_items_review['order_id'][df_orders_customers_payments_items_review['order_id'].duplicated()]
-#print(order_id_duplicados)
-
-#pedidos_por_cliente = df_orders_customers_payments_items_review.groupby("customer_id")["order_id"].count()
-# Mostrar los resultados, asegurando que se ve la distribución de pedidos por cliente
-#print(pedidos_por_cliente.value_counts().sort_index())
-
-#Guardar resultados en un csv
-#df_orders_customers_payments_items_review.to_csv('df_orders_customs_payments_items_review.csv', index=False)
 
 
 #---------------------------------------------------------------------------
